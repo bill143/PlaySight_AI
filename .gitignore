@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Env / secrets
+.env
+configs/google_client_secret.json
+configs/youtube_token.json
+*.pem
+
+# Data & outputs (keep folders)
+data/*
+!data/.gitkeep
+outputs/*
+!outputs/.gitkeep
+playsight.db
+*.sqlite3
+
+# Node / Next.js
+node_modules/
+dashboard/.next/
+dashboard/out/
+dashboard/next-env.d.ts
+npm-debug.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
