@@ -1,0 +1,55 @@
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Alembic
+alembic/__pycache__/
+backend/alembic/__pycache__/
+
+# Node / Next.js
+dashboard/node_modules/
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.*
+*.env
+!.env.example
+
+# IDEs / Editors
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+# Data outputs and uploads
+/data/outputs/
+/data/uploads/
+/data/*.mp4
+/data/**/*.mp4
+/data/*.mp3
+/data/**/*.mp3
+!data/.gitkeep
+
+# Docker / local volumes
+postgres_data/
+redis_data/
+minio_data/

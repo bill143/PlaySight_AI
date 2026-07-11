@@ -1,0 +1,28 @@
+# Non-secret default settings for local and shared development environments.
+# Secrets and environment-specific overrides belong in `.env` or real environment variables.
+# The backend loader flattens nested keys into ENV_VAR style names and also reads flat leaf keys.
+
+app:
+  name: PlaySight AI
+  environment: development
+  log_level: INFO
+  api_v1_prefix: /api/v1
+
+detection:
+  yolo_model_path: yolov8n.pt
+  confidence_threshold: 0.35
+
+tracking:
+  max_age: 30
+
+storage:
+  output_dir: data/outputs
+
+app_name: PlaySight AI
+environment: development
+log_level: INFO
+api_v1_prefix: /api/v1
+yolo_model_path: yolov8n.pt
+detection_confidence_threshold: 0.35
+tracker_max_age: 30
+output_dir: data/outputs

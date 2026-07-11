@@ -1,0 +1,12 @@
+services:
+  api:
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app/backend
+      - ./data:/app/data
+
+  dashboard:
+    command: npm run dev
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules

@@ -1,0 +1,41 @@
+# Alternative logging configuration using Python's dictConfig schema.
+# backend/core/logging.py uses structlog programmatically by default; this file is
+# provided for operators who prefer classic dictConfig-based logging setups.
+
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  simple:
+    format: '%(asctime)s | %(levelname)s | %(name)s | %(message)s'
+  json_like:
+    format: '{"timestamp":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","message":"%(message)s"}'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: simple
+    stream: ext://sys.stdout
+
+root:
+  level: INFO
+  handlers:
+    - console
+
+loggers:
+  uvicorn:
+    level: INFO
+    handlers:
+      - console
+    propagate: false
+  sqlalchemy.engine:
+    level: WARNING
+    handlers:
+      - console
+    propagate: false
+  celery:
+    level: INFO
+    handlers:
+      - console
+    propagate: false
