@@ -1,0 +1,119 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "playsight"
+version = "0.1.0"
+description = "PlaySight AI - multi-sport video analytics, club operations, and athlete development."
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "PlaySight AI Engineering" }]
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2",
+    "pydantic-settings",
+    "PyYAML",
+    "sqlalchemy>=2.0",
+    "alembic",
+    "psycopg2-binary",
+    "celery[redis]",
+    "redis",
+    "boto3",
+    "python-multipart",
+    "PyJWT",
+    "bcrypt",
+    "typer",
+    "rich",
+    "httpx",
+    "tenacity",
+    "structlog",
+    "pandas",
+    "pyarrow",
+    "numpy",
+    "opencv-python-headless",
+    "pillow",
+    "fpdf2",
+    "imageio-ffmpeg",
+    "google-api-python-client",
+    "google-auth",
+    "google-auth-oauthlib",
+    "gtts",
+]
+
+[project.optional-dependencies]
+cv = [
+    "ultralytics",
+    "torch",
+    "torchvision",
+    "easyocr",
+    "supervision",
+]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "ruff",
+    "black",
+    "mypy",
+    "types-PyYAML",
+    "httpx",
+    "faker",
+]
+
+[project.scripts]
+playsight = "playsight.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["playsight"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency-injection callables are legitimate argument defaults.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Cookie",
+    "fastapi.Security",
+    # Project dependency factories used inside Depends(...) defaults.
+    "playsight.auth.rbac.require_roles",
+    "playsight.config.flags.require_feature",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py311", "py312"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = false
+files = ["src/playsight"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "cv: tests that require the optional [cv] extra (skipped in CI via -m 'not cv')",
+]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src/playsight"]

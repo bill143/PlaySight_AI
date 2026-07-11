@@ -1,0 +1,58 @@
+# PlaySight AI - base configuration.
+# Every value here can be overridden by environment variables with the
+# `PLAYSIGHT_` prefix and `__` as the nested delimiter, e.g.:
+#   PLAYSIGHT_DATABASE_URL, PLAYSIGHT_STORAGE__BACKEND, PLAYSIGHT_AUTH__SECRET_KEY
+# The file loaded is chosen by PLAYSIGHT_CONFIG (default: configs/default.yaml).
+
+# Runtime environment: dev | test | prod
+env: dev
+
+# SQLAlchemy database URL. SQLite for local dev; Postgres inside docker-compose.
+database_url: "sqlite:///./playsight.db"
+
+# Redis URL used as Celery broker/result backend. Empty string => eager (in-process) jobs.
+redis_url: "redis://localhost:6379/0"
+
+storage:
+  # Object storage backend: local | s3 (MinIO is `s3` with an endpoint override).
+  backend: local
+  # Root directory for the `local` backend.
+  local_root: "./outputs/storage"
+  # s3/MinIO settings (defaults match the docker-compose MinIO service).
+  s3_endpoint: "http://localhost:9000"
+  s3_bucket: "playsight"
+  s3_access_key: "minioadmin"
+  s3_secret_key: "minioadmin"
+  s3_region: "us-east-1"
+
+auth:
+  # DEV-ONLY default. Set PLAYSIGHT_AUTH__SECRET_KEY in any real deployment;
+  # a warning is logged when this default is used with env=prod.
+  secret_key: "dev-only-insecure-secret-change-me"
+  access_ttl_minutes: 30
+  refresh_ttl_days: 14
+
+pipeline:
+  # Minimum detection confidence kept by the person detector.
+  detection_conf: 0.35
+  # Process every Nth frame.
+  frame_stride: 2
+  # Optional hard cap on processed frames (smoke runs); null = no cap.
+  max_frames: null
+
+youtube:
+  client_secrets_file: "configs/google_client_secret.json"
+  token_file: "configs/youtube_token.json"
+
+# Feature flags (global defaults; per-club overrides live in the club_modules table).
+features:
+  video_analytics: true
+  publishing_youtube: true
+  competition: false
+  merchandise: false
+  playbook: false
+  training: false
+  nutrition: false
+  registration: false
+  payments: false
+  commerce: false
