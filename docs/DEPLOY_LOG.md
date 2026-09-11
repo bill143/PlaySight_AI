@@ -38,3 +38,47 @@ Repo changes (all verified by the local gate below):
 Committed to `main` and pushed to `origin` (HTTPS, cached credentials). Also committed previously-untracked `docs/DEPLOY_LOOP_PROMPT.md`, `PlaySight_AI.md`, and this log.
 
 Note for Phase 2: Render `connectionString` may use the `postgres://` scheme; SQLAlchemy 2 requires `postgresql://` — normalize when setting `PLAYSIGHT_DATABASE_URL`, or map the scheme in the env var value set via API.
+
+## 2026-09-11 16:58Z — Phase 2: Provision backend on Render (attempt 1) — BLOCKED (billing)
+
+Verified current Render API v1 endpoint shapes against api-docs.render.com before any call
+(POST /postgres, POST /key-value, POST /services with serviceDetails/envSpecificDetails,
+GET /postgres/{id}/connection-info, GET /key-value/{id}/connection-info, GET /logs,
+GET /services/{id}/deploys with status enums). All API interactions written as committed
+python scripts under `deploy/render/` (`render_api.py` helper, `provision.py` idempotent
+provisioner, `check_owner.py` diagnostics); secrets read from `deploy/.secrets/deploy.env`
+at runtime, never inlined or printed.
+
+Executed:
+
+1. Generated `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` (token_urlsafe 32) and
+   `PROD_JWT_SECRET` (`secrets.token_hex(32)`) → appended to `deploy/.secrets/deploy.env`
+   only (idempotent, never committed/logged).
+2. `POST /postgres` (playsight-db, plan basic_256mb, region oregon, pg16, db/user
+   `playsight`) → **HTTP 402**: "Payment information is required to complete this request.
+   To add a card, visit https://dashboard.render.com/billing". Deterministic — confirmed
+   identical on 3 consecutive attempts.
+3. Diagnostics (`check_owner.py`): API key sees exactly one workspace —
+   `tea-d8bkt4t7vvec73f4q4j0` "CONSTRUCTION PROJECTS" (team) — matching the validated
+   RENDER_OWNER_ID; 0 existing services. No alternate workspace with billing exists.
+4. Proceeded with everything creatable without a card: **Key Value `playsight-kv` created**
+   — id `red-dai7krmk1f9s73de3dj0`, plan free, region oregon,
+   `maxmemoryPolicy=noeviction` ACCEPTED on the free plan → no Celery eviction risk;
+   the risk fallback documented in the runbook is not needed. Recorded in
+   `deploy/render/state.json` (ids only, no secrets).
+5. Remaining resources all require a card on file (Phase 0 checklist item 1b was not
+   completed): Postgres basic_256mb (~$6/mo), MinIO private service starter (~$7/mo)
+   + 10 GB disk (~$3/mo), api web starter (~$7/mo), worker background standard (~$25/mo).
+   Projected total ~$48/mo — within the ≤$50 gate. Reduction knobs on record:
+   (a) swap MinIO for Cloudflare R2 (−$10/mo), (b) downgrade worker to starter with
+   core-deps image (−$18/mo).
+
+BLOCKER: Cannot create any paid Render resource (Postgres, MinIO, api, worker); Phase 2-3
+cannot complete.
+CAUSE: The Render workspace tea-d8bkt4t7vvec73f4q4j0 has no payment method on file; the
+API returns 402 for every paid-plan create. Card entry is human-only by policy.
+RESOLUTION (minimum human action): dashboard.render.com → workspace "CONSTRUCTION
+PROJECTS" → Workspace Settings → Billing → add a payment method (~$48/mo projected).
+AFTER RESOLUTION: Re-run `python deploy/render/provision.py` (idempotent — skips the
+existing Key Value), then the deploy-poll + health-verify steps; Phases 2-3 resume fully
+automatically.
