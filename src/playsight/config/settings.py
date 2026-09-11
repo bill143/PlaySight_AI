@@ -14,12 +14,13 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
+    NoDecode,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
@@ -117,6 +118,12 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./playsight.db"
     redis_url: str = "redis://localhost:6379/0"
 
+    #: Allowed CORS origins for the API (``PLAYSIGHT_CORS_ORIGINS`` accepts a
+    #: comma-separated string or a list; default keeps localhost for dev).
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:3000"]
+    )
+
     storage: StorageSettings = Field(default_factory=StorageSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
     pipeline: PipelineSettings = Field(default_factory=PipelineSettings)
@@ -124,19 +131,24 @@ class Settings(BaseSettings):
 
     features: dict[str, bool] = Field(default_factory=lambda: dict(DEFAULT_FEATURES))
 
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value: Any) -> Any:
+        """Accept a comma-separated string (env var) or a list (YAML/kwargs)."""
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
     @model_validator(mode="after")
     def _finalize(self) -> Settings:
-        """Merge feature defaults and warn on insecure prod configuration."""
+        """Merge feature defaults and refuse insecure prod configuration."""
         merged = dict(DEFAULT_FEATURES)
         merged.update(self.features)
         self.features = merged
         if self.env == "prod" and self.auth.secret_key == _DEV_SECRET_KEY:
-            # Local import avoids configuring logging as an import side effect.
-            from playsight.core.logging import get_logger
-
-            get_logger(__name__).warning(
-                "insecure_auth_secret_key",
-                detail="auth.secret_key is the dev default; set PLAYSIGHT_AUTH__SECRET_KEY",
+            raise ValueError(
+                "auth.secret_key is the insecure dev default and env is 'prod'; "
+                "set PLAYSIGHT_AUTH__SECRET_KEY to a real secret before starting."
             )
         return self
 

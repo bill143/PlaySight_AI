@@ -1,0 +1,116 @@
+# Render Blueprint for PlaySight AI production (documentation + reproducibility).
+#
+# Mirrors what the deploy loop provisions via the Render REST API:
+#   - api:    Docker web service (slim core deps), health-checked on the liveness probe.
+#   - worker: Docker background worker with real CV engines (CPU torch + [cv] extra);
+#             Standard plan (2 GB RAM) — torch/YOLO OOM below 2 GB.
+#   - playsight-kv: Key Value (Redis-compatible) Celery broker; noeviction is required
+#             for a Celery broker (evicted keys would silently drop tasks).
+#   - playsight-db: managed Postgres (basic-256mb).
+#
+# Secrets (sync: false) are set via the Render dashboard/API, never committed:
+#   PLAYSIGHT_AUTH__SECRET_KEY  — generated per environment; app refuses the dev default in prod.
+#   PLAYSIGHT_CORS_ORIGINS      — the dashboard origin (Vercel URL until custom DNS lands).
+#   Storage credentials         — Cloudflare R2 (S3-compatible) when provided.
+#
+# Object storage fallback (only if R2 credentials are absent): MinIO as a private
+# service with an attached disk. Kept as a commented block below so the primary
+# path (R2) stays the single active storage declaration.
+
+services:
+  - name: playsight-api
+    type: web
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./docker/Dockerfile.api
+    dockerContext: .
+    healthCheckPath: /api/v1/health/live
+    autoDeploy: true
+    envVars:
+      - key: PLAYSIGHT_ENV
+        value: prod
+      - key: PLAYSIGHT_DATABASE_URL
+        fromDatabase:
+          name: playsight-db
+          property: connectionString
+      - key: PLAYSIGHT_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: playsight-kv
+          property: connectionString
+      - key: PLAYSIGHT_STORAGE__BACKEND
+        value: s3
+      - key: PLAYSIGHT_AUTH__SECRET_KEY
+        sync: false
+      - key: PLAYSIGHT_CORS_ORIGINS
+        sync: false
+      - key: PLAYSIGHT_STORAGE__S3_ENDPOINT
+        sync: false
+      - key: PLAYSIGHT_STORAGE__S3_BUCKET
+        sync: false
+      - key: PLAYSIGHT_STORAGE__S3_ACCESS_KEY
+        sync: false
+      - key: PLAYSIGHT_STORAGE__S3_SECRET_KEY
+        sync: false
+
+  - name: playsight-worker
+    type: worker
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./docker/Dockerfile.worker
+    dockerContext: .
+    autoDeploy: true
+    envVars:
+      - key: PLAYSIGHT_ENV
+        value: prod
+      - key: PLAYSIGHT_DATABASE_URL
+        fromDatabase:
+          name: playsight-db
+          property: connectionString
+      - key: PLAYSIGHT_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: playsight-kv
+          property: connectionString
+      - key: PLAYSIGHT_STORAGE__BACKEND
+        value: s3
+      - key: PLAYSIGHT_AUTH__SECRET_KEY
+        sync: false
+      - key: PLAYSIGHT_STORAGE__S3_ENDPOINT
+        sync: false
+      - key: PLAYSIGHT_STORAGE__S3_BUCKET
+        sync: false
+      - key: PLAYSIGHT_STORAGE__S3_ACCESS_KEY
+        sync: false
+      - key: PLAYSIGHT_STORAGE__S3_SECRET_KEY
+        sync: false
+
+  - name: playsight-kv
+    type: keyvalue
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []  # internal connections only (Celery broker)
+
+  # --- MinIO fallback (activate ONLY if Cloudflare R2 credentials are absent) ---
+  # - name: playsight-minio
+  #   type: pserv
+  #   runtime: image
+  #   image:
+  #     url: minio/minio:latest
+  #   plan: starter
+  #   dockerCommand: minio server /data
+  #   disk:
+  #     name: minio-data
+  #     mountPath: /data
+  #     sizeGB: 10
+  #   envVars:
+  #     - key: MINIO_ROOT_USER
+  #       sync: false
+  #     - key: MINIO_ROOT_PASSWORD
+  #       sync: false
+
+databases:
+  - name: playsight-db
+    plan: basic-256mb
+    databaseName: playsight
+    user: playsight

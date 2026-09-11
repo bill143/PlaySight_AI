@@ -14,6 +14,10 @@ from sqlalchemy import engine_from_config, pool
 import playsight.db.models  # noqa: F401  (side effect: register models on metadata)
 from playsight.config.settings import get_settings
 from playsight.db.base import Base
+from playsight.modules import import_all_models
+
+# Register Phase 2/3 module tables so autogenerate sees the full metadata.
+import_all_models()
 
 config = context.config
 

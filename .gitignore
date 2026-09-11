@@ -40,3 +40,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Deploy secrets (never committed)
+deploy/.secrets/

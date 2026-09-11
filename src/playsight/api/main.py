@@ -7,7 +7,8 @@ Run with::
 Wiring:
 
 - All routers mount under ``/api/v1``.
-- CORS allows the dashboard origin ``http://localhost:3000``.
+- CORS origins come from settings (``PLAYSIGHT_CORS_ORIGINS``, comma-separated;
+  default ``http://localhost:3000`` for local dev).
 - ``CorrelationIdMiddleware`` reads/sets ``X-Correlation-ID`` and binds it
   into structlog for every request.
 - ``PlaySightError`` maps to its canonical HTTP status with body
@@ -40,6 +41,7 @@ from playsight.api.routers import (
     publish,
     teams,
 )
+from playsight.config.settings import get_settings
 from playsight.core.errors import PlaySightError
 from playsight.core.logging import configure_logging, get_logger
 from playsight.db.session import init_db
@@ -48,8 +50,6 @@ from playsight.modules import import_all_models, iter_routers
 log = get_logger(__name__)
 
 API_PREFIX = "/api/v1"
-
-CORS_ORIGINS = ["http://localhost:3000"]
 
 OPENAPI_TAGS: list[dict[str, Any]] = [
     {"name": "auth", "description": "Registration bootstrap, login, token refresh."},
@@ -145,7 +145,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=CORS_ORIGINS,
+        allow_origins=get_settings().cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
