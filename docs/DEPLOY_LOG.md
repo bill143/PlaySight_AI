@@ -82,3 +82,39 @@ PROJECTS" → Workspace Settings → Billing → add a payment method (~$48/mo p
 AFTER RESOLUTION: Re-run `python deploy/render/provision.py` (idempotent — skips the
 existing Key Value), then the deploy-poll + health-verify steps; Phases 2-3 resume fully
 automatically.
+
+## 2026-09-11 22:04Z — Phase 2-3: Provision + deploy backend (attempt 2) — BLOCKED (billing, unchanged)
+
+Executed:
+
+1. Re-ran `python deploy/render/provision.py` (idempotent). Key Value `playsight-kv`
+   (`red-dai7krmk1f9s73de3dj0`, free, noeviction) correctly skipped via `state.json`.
+   `POST /postgres` (playsight-db, basic_256mb, oregon) → **HTTP 402** "Payment information
+   is required to complete this request." — identical to attempt 1.
+2. Re-ran diagnostics (`python deploy/render/check_owner.py`): API key still sees exactly
+   one workspace — `tea-d8bkt4t7vvec73f4q4j0` "CONSTRUCTION PROJECTS" (team) — and 0
+   existing services. No alternate workspace with billing appeared.
+3. Retried `provision.py` once more → identical 402. That is **5 consecutive identical
+   failures** across attempts 1-2 (3 + 2), and card entry is human-only by policy in any
+   case — hard blocker stands.
+4. Nothing further is executable in Phases 2-3: every remaining resource (Postgres
+   basic_256mb, MinIO private service + 10 GB disk, api web starter, worker background
+   standard) requires a payment method on file. The free Key Value is the only card-free
+   resource and it already exists.
+
+Cost projection (unchanged from attempt 1, all prices Render list): api starter $7 +
+worker standard $25 + Postgres basic_256mb $6 + MinIO starter $7 + 10 GB disk $2.50 +
+Key Value free = **~$47.50/month** — within the ≤$50 gate. Reduction knobs on record:
+(a) swap MinIO for Cloudflare R2 (−$9.50/mo), (b) downgrade worker to starter with
+core-deps image (−$18/mo).
+
+BLOCKER: Cannot create any paid Render resource (Postgres, MinIO, api, worker); Phases
+2-3 cannot proceed. 5 consecutive identical 402 failures confirmed.
+CAUSE: Render workspace tea-d8bkt4t7vvec73f4q4j0 ("CONSTRUCTION PROJECTS") still has no
+payment method on file — Phase 0 checklist item 1b remains incomplete. Card entry is
+human-only by policy.
+RESOLUTION (minimum human action): dashboard.render.com → workspace "CONSTRUCTION
+PROJECTS" → Workspace Settings → Billing → add a payment method (~$47.50/mo projected).
+AFTER RESOLUTION: Re-run the Phase 2-3 loop: `python deploy/render/provision.py`
+(idempotent) creates Postgres, MinIO, api, worker with all env vars; deploy polling and
+health verification (`/api/v1/health/live` + `/ready`) then run fully automatically.
