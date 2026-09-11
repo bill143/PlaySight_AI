@@ -179,3 +179,38 @@ Failures hit and fixed (root causes, not retries-in-place):
 
 Worker deploy (CPU torch image, remote classic builder, 10-25 min expected) started; outcome
 appended below when complete.
+
+### 2026-09-11 23:35Z — Phase 2-3 OUTCOME: COMPLETE — backend live on Fly.io
+
+Worker deploy finished on the classic remote builder (~30 min build, image 3.0 GB —
+CPU torch + [cv]). Machine 48ee1e9a2d73d8 (ord, shared-cpu-1x:2048MB) started;
+logs show `Connected to redis://...@fly-playsight-redis.upstash.io:6379//` and
+**`celery@48ee1e9a2d73d8 ready.`** (v5.6.3) — broker is the real Upstash Redis, not eager mode.
+
+Final verification (`python deploy/fly/verify.py`) — **VERIFY PASS**:
+- `GET https://playsight-api.fly.dev/api/v1/health/live` → 200 `{"status":"ok"}`
+- `GET https://playsight-api.fly.dev/api/v1/health/ready` → 200 `{"database":"ok","redis":"ok"}`
+- worker logs: celery ready banner found
+- `flyctl status`: playsight-api started, playsight-worker started
+- Transient note: one /ready poll returned 503 (redis "error") during worker boot and
+  recovered on the next poll — the health check uses a 1s socket timeout to Upstash, which is
+  tight; treat isolated 503s as transient unless sustained.
+
+**Apps + URLs:**
+- API:    https://playsight-api.fly.dev (playsight-api, shared-cpu-1x 1024MB, min 1, auto-stop off)
+- Worker: playsight-worker (no public service, shared-cpu-1x 2048MB, kill_timeout 120s)
+- DB:     playsight-db (postgres-flex 18.1, shared-cpu-1x 256MB, 3 GB vol) @ playsight-db.flycast:5432
+- Redis:  playsight-redis (Upstash pay-as-you-go, eviction disabled)
+- Storage: Tigris bucket `playsight` @ https://fly.storage.tigris.dev
+
+**Monthly cost math (Fly list prices, ord):**
+- playsight-api    shared-cpu-1x 1024MB ≈ $5.70
+- playsight-worker shared-cpu-1x 2048MB ≈ $10.70
+- playsight-db     shared-cpu-1x 256MB $1.94 + 3 GB volume $0.45 ≈ $2.40
+- playsight-redis  Upstash pay-as-you-go $0.20/100K commands (Celery polls the broker —
+  expect low single digits $/mo; watch the first invoice, fixed plan is the fallback)
+- Tigris           usage-based (~$0.02/GB-mo storage; negligible at launch)
+- **Projected total ≈ $19-25/month** — under the cap; roughly half the Render projection.
+
+Remaining for later phases: Vercel dashboard deploy, patch `PLAYSIGHT_CORS_ORIGINS` to the
+real dashboard origin, Phase 6 E2E smoke, Phase 7 ops hardening.
