@@ -34,7 +34,11 @@ const API_PREFIX = "/api/v1";
 
 /** API origin, e.g. `http://localhost:8000` (no trailing slash). */
 export function apiBaseUrl(): string {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ??
+    (process.env.NODE_ENV === "production"
+      ? "https://playsight-api.fly.dev"
+      : "http://localhost:8000");
   return base.replace(/\/+$/, "");
 }
 
