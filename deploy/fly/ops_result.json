@@ -1,0 +1,26 @@
+{
+  "postgres_backup_posture": {
+    "volumes": [
+      {
+        "id": "vol_4oj1zjjo7y6qlnor",
+        "size_gb": 3,
+        "snapshot_retention": 5,
+        "auto_backup_enabled": true
+      }
+    ],
+    "snapshots": {
+      "vol_4oj1zjjo7y6qlnor": []
+    }
+  },
+  "structured_logs": {
+    "total_lines": 100,
+    "json_log_lines": 69,
+    "lines_with_correlation_id": 69,
+    "sample": "{\"event\": \"request_finished\", \"correlation_id\": \"bb600c235f994f5593dc3704672722ea\", \"method\": \"GET\", \"path\": \"/api/v1/health/live\", \"status_code\": 200}"
+  },
+  "summary": {
+    "pg_volume_count": 1,
+    "pg_daily_snapshots_present": false,
+    "structured_logs_with_correlation_ids": true
+  }
+}

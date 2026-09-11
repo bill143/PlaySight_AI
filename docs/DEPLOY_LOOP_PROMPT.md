@@ -1,4 +1,4 @@
-# PlaySight_AI — AUTONOMOUS DEPLOY LOOP PROMPT (Render edition)
+# PlaySight_AI — AUTONOMOUS DEPLOY LOOP PROMPT (Fly.io edition)
 
 > **How to use:** open Claude Code Terminal in `C:\DEVELOP\02_ACTIVE_BUILD\PlaySight_AI` and paste
 > everything below the line into the session. Complete the PHASE 0 human checklist first (~10
@@ -18,7 +18,7 @@ ACCEPTANCE CRITERION passes or a HARD BLOCKER (defined below) is written to the 
 
 | Concern | Selection | Why |
 |---|---|---|
-| API + Celery worker + Postgres + Redis | **Render** (dashboard.render.com) — Docker web service (api), Docker background worker (worker), managed **Postgres**, **Key Value** (Redis-compatible) for the Celery broker. Declared in a committed `render.yaml` Blueprint. | Operator's chosen platform; Blueprint = reproducible infra-as-code; REST API + CLI are token-driven and non-interactive. If `RAILWAY_TOKEN` is present INSTEAD of `RENDER_API_KEY`, substitute Railway equivalents — same phases. |
+| API + Celery worker + Postgres + Redis + storage | **Fly.io** (org `billy_ai`, region `ord`) — two Fly apps (`playsight-api` Docker web app, `playsight-worker` Docker Celery worker), unmanaged **Fly Postgres** (`playsight-db`, postgres-flex), **Upstash Redis** via `flyctl redis create` (`playsight-redis`, eviction disabled) for the Celery broker, and **Tigris object storage** (bucket `playsight`, S3-compatible, via `flyctl storage create`). Provisioned by committed idempotent scripts under `deploy/fly/` + `api.fly.toml` / `worker.fly.toml`. | Pivot after Railway → Render billing blockers; flyctl is token-driven and non-interactive; scripts + fly.toml = reproducible infra-as-code; total ≈ half the Render projection. |
 | Dashboard (Next.js) | **Vercel** (account already exists — used for nexus-est-app, prop-marketplace) | Zero-config Next.js, free hobby tier |
 | Object storage (S3 API) | **Cloudflare R2**; FALLBACK if R2 creds absent: MinIO as a Render **Private Service** with an attached Disk | S3-compatible, no egress fees |
 | DNS/TLS | `app.<DOMAIN>` → Vercel, `api.<DOMAIN>` → Render custom domain; automatic TLS on both | If `CLOUDFLARE_API_TOKEN` is provided, create the CNAMEs via API; otherwise print the exact records for the operator and continue with `*.onrender.com` / `*.vercel.app` URLs in the meantime |
@@ -33,7 +33,7 @@ single permitted stop.
 
 ```
 # deploy/.secrets/deploy.env  (NEVER committed)
-RENDER_API_KEY=           # REQUIRED — the only hard requirement
+FLY_API_TOKEN=            # REQUIRED — the only hard requirement (org billy_ai)
 VERCEL_TOKEN=             # REQUIRED in a terminal session; SKIP if the Claude desktop-app
                           #   session runs the loop (its Vercel connector is already authorized)
 DOMAIN=                   # optional — leave empty to launch on onrender.com/vercel.app URLs
@@ -46,14 +46,14 @@ RAILWAY_TOKEN=            # optional alternative backend — used only if RENDER
 ```
 
 **Human checklist (accounts & tokens — Claude never creates accounts or handles passwords):**
-1. **Render** — https://dashboard.render.com → **"Sign in with GitHub"** (the `bill143` account —
-   SSO means no new password exists at all). Then, in the dashboard:
-   a. Click your avatar (top right) → **Account Settings** → **API Keys** → **Create API Key**
-      → paste the value as `RENDER_API_KEY`.
-   b. **Workspace Settings → Billing** → add a payment method (Render requires a card on file
-      for paid instance types; ~$38/month projected — Claude will never touch this screen).
-   c. When the loop first creates services from the repo, Render may prompt once to install the
-      **Render GitHub App** on `bill143/PlaySight_AI` — approve it (one click).
+1. **Fly.io** — https://fly.io → sign in (the `bill143` GitHub account). Then:
+   a. Go to **https://fly.io/dashboard/billy_ai/tokens** → **Create token** (org-scoped deploy
+      token for org `billy_ai`) → paste the value as `FLY_API_TOKEN` in
+      `deploy/.secrets/deploy.env`.
+   b. **Dashboard → Billing** → add a payment method (Fly requires a card for machines/volumes;
+      ~$19-25/month projected — Claude will never touch this screen).
+   c. Install `flyctl` via winget (`winget install Fly-io.flyctl`); the scripts call it by full
+      path, no shell alias needed.
 2. **Vercel** — existing account → https://vercel.com/account/tokens → **Create** → `VERCEL_TOKEN`.
 3. **Cloudflare R2** (recommended, optional) — dash.cloudflare.com → **R2** → enable → Create
    bucket `playsight` → **Manage R2 API Tokens** → Create (Object Read & Write) → copy the three

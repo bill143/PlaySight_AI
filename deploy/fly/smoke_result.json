@@ -1,0 +1,86 @@
+{
+  "checks": {
+    "health.live": {
+      "ok": true,
+      "detail": "{\"status\":\"ok\"}"
+    },
+    "health.ready": {
+      "ok": true,
+      "detail": "attempts=1 {\"status\":\"ok\",\"checks\":{\"database\":\"ok\",\"redis\":\"ok\"}}"
+    },
+    "bootstrap.register_club": {
+      "ok": true,
+      "detail": "rerun: register -> 403, login OK"
+    },
+    "fixture.team_players_match": {
+      "ok": true,
+      "detail": "team=831f0a1f5c234190a16f8558b7620596 match=b7ce487edb0a42f3ba3c18a93cefc756"
+    },
+    "upload.video": {
+      "ok": true,
+      "detail": "asset=d52815148fb04f1680d7b45d1f2dd519 duration=12.0s"
+    },
+    "pipeline.analyze_succeeded": {
+      "ok": true,
+      "detail": "job=d7d4dae20b84461980d2e2a3234c2cff"
+    },
+    "artifact.match_summary": {
+      "ok": true,
+      "detail": "2816 bytes engines={'detector': 'yolo', 'tracker': 'bytetrack', 'ocr': 'easyocr'}"
+    },
+    "engines.real_cv": {
+      "ok": true,
+      "detail": "detector/tracker/ocr = {'detector': 'yolo', 'tracker': 'bytetrack', 'ocr': 'easyocr'}"
+    },
+    "artifact.player_stats_csv": {
+      "ok": true,
+      "detail": "487 bytes"
+    },
+    "artifact.annotated_video": {
+      "ok": true,
+      "detail": "1948005 bytes"
+    },
+    "artifact.player_pdf": {
+      "ok": true,
+      "detail": "2458 bytes magic=b'%PDF-'"
+    },
+    "artifact.match_audio": {
+      "ok": true,
+      "detail": "416832 bytes"
+    },
+    "artifact.player_highlights": {
+      "ok": true,
+      "detail": "2431325 bytes"
+    },
+    "tenancy.bootstrap_closed": {
+      "ok": true,
+      "detail": "register -> 403"
+    },
+    "tenancy.cross_club_match_404": {
+      "ok": true,
+      "detail": "GET match -> 404"
+    },
+    "tenancy.cross_club_artifact_404": {
+      "ok": true,
+      "detail": "GET artifact download -> 404"
+    }
+  },
+  "engines": {
+    "detector": "yolo",
+    "tracker": "bytetrack",
+    "ocr": "easyocr"
+  },
+  "artifacts": {
+    "kinds": [
+      "annotated_video",
+      "match_summary",
+      "player_identities",
+      "player_report_json",
+      "player_report_pdf",
+      "player_stats",
+      "player_tracks"
+    ]
+  },
+  "match_id": "b7ce487edb0a42f3ba3c18a93cefc756",
+  "passed": true
+}

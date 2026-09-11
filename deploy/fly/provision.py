@@ -40,22 +40,27 @@ def provision_postgres(state: dict) -> None:
         return
     proc = run_fly(
         [
-            "postgres", "create",
-            "--name", PG_APP,
-            "--org", ORG,
-            "--region", REGION,
-            "--initial-cluster-size", "1",
-            "--vm-size", "shared-cpu-1x",
-            "--volume-size", "3",
+            "postgres",
+            "create",
+            "--name",
+            PG_APP,
+            "--org",
+            ORG,
+            "--region",
+            REGION,
+            "--initial-cluster-size",
+            "1",
+            "--vm-size",
+            "shared-cpu-1x",
+            "--volume-size",
+            "3",
         ],
         timeout=1200,
     )
     out = proc.stdout + "\n" + proc.stderr
     if proc.returncode != 0:
         # Do not print raw output blindly — it may contain the password line.
-        safe = "\n".join(
-            ln for ln in out.splitlines() if "password" not in ln.lower()
-        )
+        safe = "\n".join(ln for ln in out.splitlines() if "password" not in ln.lower())
         print(safe, file=sys.stderr)
         raise SystemExit("postgres create failed")
 
@@ -108,10 +113,14 @@ def provision_redis(state: dict) -> None:
     if not exists:
         proc = run_fly(
             [
-                "redis", "create",
-                "--name", REDIS_NAME,
-                "--org", ORG,
-                "--region", REGION,
+                "redis",
+                "create",
+                "--name",
+                REDIS_NAME,
+                "--org",
+                ORG,
+                "--region",
+                REGION,
                 "--disable-eviction",
                 "--no-replicas",
             ],
@@ -161,7 +170,9 @@ def provision_storage(state: dict) -> None:
     )
     out = proc.stdout + "\n" + proc.stderr
     if proc.returncode != 0:
-        safe = "\n".join(ln for ln in out.splitlines() if "SECRET" not in ln.upper() or ":" not in ln)
+        safe = "\n".join(
+            ln for ln in out.splitlines() if "SECRET" not in ln.upper() or ":" not in ln
+        )
         print(safe, file=sys.stderr)
         raise SystemExit("storage create failed")
 
@@ -173,7 +184,8 @@ def provision_storage(state: dict) -> None:
         "TIGRIS_AWS_ACCESS_KEY_ID": grab("AWS_ACCESS_KEY_ID"),
         "TIGRIS_AWS_SECRET_ACCESS_KEY": grab("AWS_SECRET_ACCESS_KEY"),
         "TIGRIS_BUCKET_NAME": grab("BUCKET_NAME") or BUCKET,
-        "TIGRIS_AWS_ENDPOINT_URL_S3": grab("AWS_ENDPOINT_URL_S3") or "https://fly.storage.tigris.dev",
+        "TIGRIS_AWS_ENDPOINT_URL_S3": grab("AWS_ENDPOINT_URL_S3")
+        or "https://fly.storage.tigris.dev",
         "TIGRIS_AWS_REGION": grab("AWS_REGION") or "auto",
     }
     missing = [k for k, v in keys.items() if not v]

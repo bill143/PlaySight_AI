@@ -214,3 +214,116 @@ Final verification (`python deploy/fly/verify.py`) — **VERIFY PASS**:
 
 Remaining for later phases: Vercel dashboard deploy, patch `PLAYSIGHT_CORS_ORIGINS` to the
 real dashboard origin, Phase 6 E2E smoke, Phase 7 ops hardening.
+
+## 2026-09-11 23:15Z — Phase 6: End-to-end production smoke (attempt 1) — PASS
+
+All verification written as the committed idempotent script `deploy/fly/smoke.py`
+(results in `deploy/fly/smoke_result.json`, no secrets); run against the PUBLIC URL
+`https://playsight-api.fly.dev/api/v1`. Admin + club2 credentials generated once and
+stored ONLY in `deploy/.secrets/deploy.env` (`ADMIN_EMAIL`/`ADMIN_PASSWORD`,
+`CLUB2_EMAIL`/`CLUB2_PASSWORD`) — operator TODO: change the admin password.
+
+Failures hit and fixed during the run (root causes, not retries-in-place):
+
+- **TLS verify failure (local):** certifi bundle missing the local issuer chain on the
+  home PC → `truststore` (OS certificate store) injected in smoke.py; requests now verify.
+- **cp1252 UnicodeEncodeError:** worker-log echoes crashed the Windows console encoder →
+  stdout/stderr reconfigured to UTF-8 in-script.
+- **Transient `/ready` 503:** known 1s Upstash socket-timeout tightness (logged in Phase
+  2-3) → ready check retries up to 3x/10s; passed attempt 1 on the final run.
+- **`flyctl ssh console -C` strips quotes** (shellwords parsing), so remote `python -c`
+  payloads are impossible → pivoted to `flyctl ssh sftp get/put` + `python /tmp/<file>`.
+- **REAL-ENGINE FINDING — synthetic demo video has no detectable persons:** first pass
+  ran the FULL pipeline green (yolo/bytetrack/easyocr confirmed in `match_summary.engine`)
+  but YOLO correctly found 0 persons in the shapes-only `demo_match.mp4` → 0 tracks,
+  0 identities, no player PDFs, no highlight targets. That is correct engine behavior,
+  not a deploy defect. Fix: smoke now builds `data/demo/smoke_person_match.mp4` — a 12s
+  720p pan over a person-bearing still pulled from the worker image's OWN installed
+  ultralytics test asset (`ultralytics/assets/bus.jpg` via `flyctl ssh sftp get`; no
+  external download) — so real detection/tracking/identity/report paths all execute.
+
+Verified end-to-end (all via public API; worker executed via Upstash Redis broker):
+
+- register-club bootstrap (first run) / login (reruns); token pair issued
+- team + 3 players + match created; 12s video uploaded multipart (probed 25fps 1280x720)
+- `POST /process` → job `d7d4dae20b84461980d2e2a3234c2cff` queued → running → succeeded
+- **`match_summary.json` engine block: `{"detector": "yolo", "tracker": "bytetrack",
+  "ocr": "easyocr"}` — REAL CV engines, no stubs; worker [cv] image confirmed**
+- Artifact downloads, all size > 0: match_summary.json 2,816 B (shape-checked),
+  player_stats.csv 487 B, annotated_video.mp4 1,948,005 B, player PDF 2,458 B
+  (`%PDF` magic verified), player_tracks.parquet + player_identities.csv registered
+- export audio job succeeded → match_summary_audio.mp3 416,832 B
+- highlights job (first player identity) succeeded → reel 2,431,325 B
+- **Tenancy:** `register-club` correctly 403 once a club exists (prod bootstrap closed
+  by design — second club therefore seeded server-side via an sftp'd script, removed
+  after use); club2 login OK; club2 GET club1 match → **404**; club2 GET club1 artifact
+  download → **404**. Cross-tenant isolation verified.
+
+## 2026-09-11 23:20Z — Phase 7: Ops hardening — COMPLETE
+
+Posture verified by committed script `deploy/fly/ops_check.py` (`ops_result.json`):
+
+- **Postgres backups (HONEST ANSWER):** `playsight-db` is UNMANAGED Fly Postgres — there
+  is no managed backup service. Protection = automatic daily VOLUME SNAPSHOTS of
+  `vol_4oj1zjjo7y6qlnor` (3 GB): `auto_backup_enabled: true`, `snapshot_retention: 5`
+  days. Snapshot list is EMPTY right now because the cluster is < 24h old — the first
+  daily snapshot has not run yet. Operator TODO: re-run
+  `python deploy/fly/ops_check.py` after 24h and confirm a snapshot appears.
+  Limits on record: 5-day retention (raise via `flyctl volumes update
+  --snapshot-retention <days>`), single-node cluster (no HA replica), snapshots are
+  crash-consistent volume images, not logical dumps.
+  **Restore notes:** list snapshots `flyctl volumes snapshots list vol_4oj1zjjo7y6qlnor`;
+  restore into a NEW cluster `flyctl postgres create --image-ref flyio/postgres-flex
+  --snapshot-id <vs_...>` then repoint `PLAYSIGHT_DATABASE_URL` on api+worker via
+  `flyctl secrets set`. For a logical dump: `flyctl proxy 15432:5432 -a playsight-db`
+  + `pg_dump` (creds in deploy.env `PG_*`).
+- **Structured logs w/ correlation ids: CONFIRMED** — sampled 100 recent api log lines:
+  69 JSON log lines, 69 with `correlation_id` (the rest are Fly runtime chrome). Sample:
+  `{"event": "request_finished", "correlation_id": "bb600c235f...", "method": "GET",
+  "path": "/api/v1/health/live", "status_code": 200}`. Worker logs carry the SAME
+  correlation id end-to-end (job dispatch → pipeline events), verified during smoke.
+
+### Day-2 runbook (Fly.io)
+
+- **Deploy (from repo root, token from deploy/.secrets/deploy.env):**
+  `flyctl deploy -c deploy/fly/api.fly.toml --dockerfile docker/Dockerfile.api --remote-only --depot=false --ha=false`
+  `flyctl deploy -c deploy/fly/worker.fly.toml --dockerfile docker/Dockerfile.worker --remote-only --depot=false --ha=false`
+  (or `python deploy/fly/deploy_apps.py`, which wraps both).
+- **Rollback:** `flyctl releases -a playsight-api` → pick the previous image →
+  `flyctl deploy -a playsight-api --image registry.fly.io/playsight-api:deployment-<ID>`.
+  Current known-good v1 images:
+  api `registry.fly.io/playsight-api:deployment-01M29A9JFX5HTTQHJZEV54XWCV`,
+  worker `registry.fly.io/playsight-worker:deployment-01M29ANA4ACZMFGAT3D8PTFEYF`.
+- **Logs:** `flyctl logs -a playsight-api` / `-a playsight-worker` (add `--no-tail` for
+  a snapshot); filter by `correlation_id` to join api request <-> worker job.
+- **Status/health:** `flyctl status -a <app>`;
+  `curl https://playsight-api.fly.dev/api/v1/health/ready` (isolated 503 = transient
+  Upstash 1s probe timeout; sustained = investigate).
+- **Secret rotation:** generate the new value locally → `flyctl secrets set KEY=<value>
+  -a playsight-api` (repeat for playsight-worker) → machines restart automatically.
+  JWT secret = `PLAYSIGHT_AUTH__SECRET_KEY` (rotating it invalidates all sessions).
+  DB/Redis/Tigris creds: rotate at the source (`flyctl postgres users`, Upstash console
+  via `flyctl redis dashboard`, `flyctl storage update`) then update the app secrets.
+- **Ops re-check:** `python deploy/fly/ops_check.py` (snapshots + structured-log audit).
+- **Smoke re-run:** `python deploy/fly/smoke.py` (idempotent; logs in as stored admin).
+
+**Operator TODOs:**
+1. Change the admin password (login with deploy.env `ADMIN_EMAIL`/`ADMIN_PASSWORD`).
+2. Confirm the first Postgres volume snapshot exists after 24h (`ops_check.py`).
+3. Optional custom domain: `flyctl certs add api.<DOMAIN> -a playsight-api` + CNAME;
+   dashboard domain on Vercel; then set `PLAYSIGHT_CORS_ORIGINS` accordingly.
+4. YouTube OAuth when wanted: `playsight youtube auth` with
+   `configs/google_client_secret.json`.
+5. Watch the first Upstash invoice (pay-as-you-go broker polling).
+
+### Acceptance criteria checklist
+
+1. ✅ `https://playsight-api.fly.dev/api/v1/health/ready` → 200 (db + redis ok).
+2. ⏸ Dashboard live on Vercel + register/login in prod — **deferred to orchestrator**.
+3. ✅ Full remote pipeline: video uploaded → processed by the WORKER via Redis (real
+   yolo/bytetrack/easyocr) → summary/CSV/annotated video/PDF/audio/highlights all
+   downloaded from Tigris through the API with size > 0.
+4. ✅* No secrets in git (scan clean); prod JWT secret is generated, dev default refused
+   at startup. *CORS restriction to the dashboard origin — **deferred to orchestrator**
+   (placeholder until the Vercel URL exists).
+5. ✅ This log: decisions, URLs, costs, runbook, operator TODOs — committed and pushed.
