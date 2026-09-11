@@ -1,0 +1,13 @@
+# PlaySight_AI Celery worker — Fly.io app config.
+# Deploy from the REPO ROOT:
+#   flyctl deploy -c deploy/fly/worker.fly.toml --dockerfile docker/Dockerfile.worker --remote-only --ha=false
+# No http_service: this app only consumes the Celery queue.
+
+app = "playsight-worker"
+primary_region = "ord"
+kill_timeout = "120s"
+
+[[vm]]
+  memory = "2048mb"
+  cpu_kind = "shared"
+  cpus = 1

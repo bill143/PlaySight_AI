@@ -1,0 +1,26 @@
+# Keep the Fly/Docker build context minimal — the images only need
+# pyproject.toml, src/, configs/, and alembic.ini (see docker/Dockerfile.*).
+.git/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+**/__pycache__/
+*.pyc
+dashboard/
+outputs/
+data/
+docs/
+tests/
+deploy/
+docker/
+htmlcov/
+.coverage
+*.db
+*.sqlite3
+.env
+.env.*
+PlaySight_AI.md
+README.md

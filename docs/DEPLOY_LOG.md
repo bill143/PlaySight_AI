@@ -118,3 +118,64 @@ PROJECTS" → Workspace Settings → Billing → add a payment method (~$47.50/m
 AFTER RESOLUTION: Re-run the Phase 2-3 loop: `python deploy/render/provision.py`
 (idempotent) creates Postgres, MinIO, api, worker with all env vars; deploy polling and
 health verification (`/api/v1/health/live` + `/ready`) then run fully automatically.
+
+## 2026-09-11 22:55Z — Phase 2-3: Provision + deploy backend on FLY.IO (attempt 1)
+
+**PLATFORM PIVOT:** Render → **Fly.io** (Render card 402 blocker stands; operator provided
+FLY_API_TOKEN). flyctl v0.4.102 (winget path), org **Billy_AI** — flyctl reports org slug
+`personal` (personal org), used for all `--org` flags. Region **ord**. All provisioning and
+verification written as committed idempotent python scripts under `deploy/fly/` (`flylib.py`,
+`provision.py`, `set_secrets.py`, `deploy_apps.py`, `verify.py` + `api.fly.toml`,
+`worker.fly.toml`, state in `deploy/fly/state.json` — ids only, no secrets). Secrets live only
+in gitignored `deploy/.secrets/deploy.env`.
+
+Provisioned (all created fresh; reruns skip via state.json + `apps list` checks):
+
+1. **Postgres** `playsight-db` — unmanaged Fly Postgres (flyio/postgres-flex:18.1), 1 node,
+   shared-cpu-1x:256MB, 3 GB volume, ord. Credentials parsed from the one-time create output
+   → `PG_*` keys in deploy.env. Internal host **playsight-db.flycast:5432** (from the printed
+   connection string). **DB NAME DECISION:** default `postgres` database used for launch —
+   `flyctl postgres connect` has no non-interactive command flag (verified via --help), so a
+   dedicated `playsight` db would need an interactive psql session. Acceptable; revisit later.
+2. **Redis** `playsight-redis` — Upstash via `flyctl redis create`, plan Pay-as-you-go,
+   **eviction disabled**, no replicas, ord. First attempt died on an interactive ProdPack
+   prompt ("prompt: non interactive"); fix: explicit `--enable-prodpack=false`. Private URL
+   captured to deploy.env as `UPSTASH_REDIS_URL`. Cost note: $0.20/100K commands and Celery
+   polls the broker — watch the first invoice; a fixed plan is the fallback.
+3. **Apps** `playsight-api`, `playsight-worker` created (`flyctl apps create --org personal`).
+4. **Tigris storage** — `flyctl storage create -n playsight -o personal -a playsight-api -y`
+   → bucket **playsight**, endpoint https://fly.storage.tigris.dev; AWS-style keys captured
+   to deploy.env as `TIGRIS_*` (also auto-set as AWS_* secrets on playsight-api by flyctl).
+
+Secrets staged on BOTH apps (`flyctl secrets set --stage`, values never echoed):
+`PLAYSIGHT_ENV=prod`, `PLAYSIGHT_DATABASE_URL` (postgresql+psycopg2 →
+playsight-db.flycast:5432/postgres), `PLAYSIGHT_REDIS_URL` (Upstash private URL),
+`PLAYSIGHT_STORAGE__BACKEND=s3` + `__S3_ENDPOINT/__S3_BUCKET/__S3_ACCESS_KEY/__S3_SECRET_KEY/
+__S3_REGION` (Tigris), `PLAYSIGHT_AUTH__SECRET_KEY` (=PROD_JWT_SECRET),
+`PLAYSIGHT_CORS_ORIGINS=http://localhost:3000` (placeholder — patched after Vercel deploy).
+
+Deploy method decision: run `flyctl deploy` from the REPO ROOT with
+`-c deploy/fly/<app>.fly.toml --dockerfile docker/Dockerfile.<app> --remote-only
+--depot=false --ha=false` — dockerfile passed on the CLI (cwd-relative) to sidestep
+fly.toml-relative path ambiguity; build context = repo root.
+
+Failures hit and fixed (root causes, not retries-in-place):
+
+- **Failure 1 — depot builder TLS:** `x509: certificate signed by unknown authority`
+  connecting to the depot.dev builder, plus a 1.3 GB build context warning (.venv 805 MB,
+  dashboard 381 MB). Fix: repo-root **`.dockerignore`** (context now ~MBs) and
+  **`--depot=false`** to use the classic Fly remote builder. Worked first try.
+- **Failure 2 — Windows cp1252:** the python wrapper crashed decoding flyctl's UTF-8 output
+  (`UnicodeDecodeError ... cp1252`). Fix: `encoding="utf-8", errors="replace"` in
+  `flylib.run_fly` + None-guards. The underlying API deploy itself had succeeded (release v1).
+- **api.fly.toml:** Fly caps http-check `grace_period` at 1m (warned it would lower 120s);
+  config set to 60s to match reality. DB init (create_all) fits comfortably.
+
+**API VERIFIED LIVE:**
+- `https://playsight-api.fly.dev/api/v1/health/live` → **200** `{"status":"ok"}`
+- `https://playsight-api.fly.dev/api/v1/health/ready` → **200**
+  `{"status":"ok","checks":{"database":"ok","redis":"ok"}}`
+- machine 080e9341ae5458 (ord, shared-cpu-1x:1024MB) started, release v1.
+
+Worker deploy (CPU torch image, remote classic builder, 10-25 min expected) started; outcome
+appended below when complete.

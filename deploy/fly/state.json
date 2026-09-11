@@ -1,0 +1,22 @@
+{
+  "postgres": {
+    "created": true,
+    "app": "playsight-db",
+    "host": "playsight-db.flycast",
+    "port": "5432",
+    "db": "postgres"
+  },
+  "redis": {
+    "created": true,
+    "name": "playsight-redis",
+    "kind": "upstash"
+  },
+  "apps": {
+    "api": "playsight-api",
+    "worker": "playsight-worker"
+  },
+  "tigris": {
+    "created": true,
+    "bucket": "playsight"
+  }
+}

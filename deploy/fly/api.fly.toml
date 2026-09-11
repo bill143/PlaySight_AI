@@ -1,0 +1,30 @@
+# PlaySight_AI API — Fly.io app config.
+# Deploy from the REPO ROOT:
+#   flyctl deploy -c deploy/fly/api.fly.toml --dockerfile docker/Dockerfile.api --remote-only --ha=false
+# The dockerfile is passed on the CLI (relative to the cwd/build context = repo
+# root) to avoid fly.toml-relative path ambiguity.
+
+app = "playsight-api"
+primary_region = "ord"
+
+[env]
+  PORT = "8000"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "60s"   # Fly caps service-check grace at 1m; DB init runs at boot
+    method = "GET"
+    path = "/api/v1/health/live"
+
+[[vm]]
+  memory = "1024mb"
+  cpu_kind = "shared"
+  cpus = 1
