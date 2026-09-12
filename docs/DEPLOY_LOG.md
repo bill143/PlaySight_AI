@@ -327,3 +327,13 @@ Posture verified by committed script `deploy/fly/ops_check.py` (`ops_result.json
    at startup. *CORS restriction to the dashboard origin — **deferred to orchestrator**
    (placeholder until the Vercel URL exists).
 5. ✅ This log: decisions, URLs, costs, runbook, operator TODOs — committed and pushed.
+
+## 2026-09-12T00:34Z — DEPLOYMENT COMPLETE (dashboard live, all acceptance criteria closed)
+
+- Dashboard LIVE: https://playsight-dashboard.fly.dev (Fly app playsight-dashboard, ord, 512MB shared-cpu-1x, min 1 machine, auto-suspend)
+- Deployed via classic remote builder (--depot=false) after depot builder TLS failures on the operator network; image 518 MB
+- PLAYSIGHT_CORS_ORIGINS locked to https://playsight-dashboard.fly.dev (+localhost for dev); OPTIONS preflight verified end-to-end
+- Final verification: dashboard 200 / api live 200 / api ready 200 {database ok, redis ok} / CORS allow-origin exact match
+- Acceptance criteria: dashboard_live PASS, cors_restricted PASS — ALL CRITERIA NOW PASS
+- Vercel path abandoned: connector lacks project-create scope (403); GitHub Actions fallback committed (.github/workflows/deploy-dashboard.yml, needs FLY_API_TOKEN repo secret to activate)
+- Operator TODO: change admin password (deploy/.secrets/deploy.env ADMIN_*) after first login; optional custom domain via fly certs

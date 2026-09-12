@@ -145,8 +145,17 @@ def main() -> None:
     else:
         raise RuntimeError("CORS allow-origin never reflected the dashboard origin")
 
-    status, _, _ = http_get(f"{API_URL}/api/v1/health/ready")
-    print(f"api ready: {status}")
+    # The CORS secret update rolls the API machine; tolerate the brief 503 window.
+    for attempt in range(12):
+        try:
+            status, _, _ = http_get(f"{API_URL}/api/v1/health/ready")
+            print(f"api ready: {status}")
+            break
+        except Exception as exc:  # noqa: BLE001 - poll loop
+            print(f"ready poll {attempt + 1}: {exc}")
+            time.sleep(10)
+    else:
+        raise RuntimeError("api /health/ready did not recover after CORS update")
     print(f"DONE: {DASH_URL}")
 
 
