@@ -1,0 +1,23 @@
+# Fly.io config for the PlaySight dashboard (Next.js production server).
+# Deploy from repo root:
+#   flyctl deploy dashboard -c deploy/fly/dashboard.fly.toml \
+#     --dockerfile docker/Dockerfile.dashboard \
+#     --build-arg NEXT_PUBLIC_API_URL=https://playsight-api.fly.dev \
+#     --remote-only --ha=false
+
+app = "playsight-dashboard"
+primary_region = "ord"
+
+[build.args]
+  NEXT_PUBLIC_API_URL = "https://playsight-api.fly.dev"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
