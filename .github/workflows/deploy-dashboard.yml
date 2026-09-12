@@ -1,0 +1,48 @@
+name: Deploy dashboard to Fly.io
+
+# Runs on GitHub's servers, so a local machine restart cannot interrupt it.
+# Requires repo secret FLY_API_TOKEN (Settings -> Secrets and variables ->
+# Actions -> New repository secret).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/**"
+      - "docker/Dockerfile.dashboard"
+      - "deploy/fly/dashboard.fly.toml"
+
+concurrency:
+  group: deploy-dashboard
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.repository == 'bill143/PlaySight_AI' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "FLY_API_TOKEN secret is not set — add it in repo Settings > Secrets > Actions"
+            exit 1
+          fi
+          flyctl deploy dashboard \
+            -c "$GITHUB_WORKSPACE/deploy/fly/dashboard.fly.toml" \
+            --dockerfile "$GITHUB_WORKSPACE/docker/Dockerfile.dashboard" \
+            --build-arg NEXT_PUBLIC_API_URL=https://playsight-api.fly.dev \
+            --remote-only --ha=false --yes
+      - name: Verify
+        run: |
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://playsight-dashboard.fly.dev/ || true)
+            echo "poll $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          exit 1
